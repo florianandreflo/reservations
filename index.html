@@ -358,10 +358,11 @@ function removeItem(key,index){
 
 // ─── CONFLICTS ───────────────────────────────────────────────
 function detectConflicts(newRes){
-  var c={terrain:[],vehicule:[]};
+  var c = {terrain:[], vehicule:[]};
 
   getResList().forEach(function(r){
-    if(r._fbKey===newRes._fbKey) return;
+
+    if(r._fbKey === newRes._fbKey) return;
 
     var dateOverlap =
       newRes.dateDebut <= r.dateFin &&
@@ -377,9 +378,18 @@ function detectConflicts(newRes){
       c.terrain.push(r);
     }
 
-    if(r.vehicule === newRes.vehicule && timeOverlap){
-      c.vehicule.push(r);
+    if(r.vehicule === newRes.vehicule){
+
+      if(!r.heureDebut || !r.heureFin){
+        c.vehicule.push(r);
+        return;
+      }
+
+      if(timeOverlap){
+        c.vehicule.push(r);
+      }
     }
+
   });
 
   return c;
