@@ -294,6 +294,7 @@ var DEFAULT_VEHICULES=['Ford Blanc Prod / SAV / DA-204-XB','Truck Volkswagen noi
 // ── DONNÉES EN MÉMOIRE (synchronisées depuis Firebase) ───────────
 var _reservations = [];
 var _lists = { pilotes: DEFAULT_PILOTES.slice(), terrains: DEFAULT_TERRAINS.slice(), vehicules: DEFAULT_VEHICULES.slice() };
+var _pin = '1234'; // sera écrasé par Firebase au chargement
 
 // ── LECTURE / ÉCRITURE FIREBASE ──────────────────────────────────
 function loadRes(){ return _reservations; }
@@ -342,6 +343,11 @@ function initFirebase(){
       populateSelects();
       renderManage();
     });
+  });
+
+  // PIN partagé via Firebase
+  onValue(ref(db, 'config/pin'), function(snap){
+    _pin = snap.val() || '1234';
   });
 }
 
@@ -581,8 +587,11 @@ var pinBuffer = '';
 var pinMode = 'unlock'; // 'unlock' | 'set-new1' | 'set-new2'
 var pinTemp = '';
 
-function getPin(){ return localStorage.getItem('app_pin') || PIN_DEFAULT; }
-function savePin(p){ localStorage.setItem('app_pin', p); }
+function getPin(){ return _pin; }
+function savePin(p){
+  _pin = p;
+  set(ref(db, 'config/pin'), p).catch(function(e){ console.error('savePin', e); });
+}
 
 function pinKey(digit){
   if(pinBuffer.length >= 4) return;
