@@ -97,60 +97,9 @@ select option{background:#1e2e1e;}
 ::-webkit-scrollbar{width:4px;height:4px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
-
-/* ── PIN LOCK ── */
-#pin-screen{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;}
-#pin-screen.hidden{display:none;}
-.pin-logo{width:64px;height:64px;background:var(--accent);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:36px;margin-bottom:20px;}
-.pin-title{font-size:22px;font-weight:700;color:var(--white);margin-bottom:6px;}
-.pin-sub{font-size:14px;color:var(--muted);margin-bottom:36px;}
-.pin-dots{display:flex;gap:16px;margin-bottom:36px;}
-.pin-dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--border);background:transparent;transition:all .15s;}
-.pin-dot.filled{background:var(--accent);border-color:var(--accent);}
-.pin-dot.error{background:var(--danger);border-color:var(--danger);}
-.pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;width:100%;max-width:280px;}
-.pin-key{aspect-ratio:1;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);font-size:22px;font-weight:700;color:var(--white);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .1s;user-select:none;-webkit-user-select:none;}
-.pin-key:active{transform:scale(.92);background:var(--accent2);}
-.pin-key.pin-empty{background:transparent;border-color:transparent;cursor:default;}
-.pin-key.pin-del{font-size:20px;color:var(--muted);}
-.pin-error-msg{margin-top:20px;font-size:13px;color:var(--danger);font-weight:600;opacity:0;transition:opacity .2s;}
-.pin-error-msg.show{opacity:1;}
-.pin-change-wrap{margin-top:28px;}
-.pin-link{font-size:12px;color:var(--muted);background:none;border:none;cursor:pointer;text-decoration:underline;font-family:inherit;}
 </style>
 </head>
 <body>
-
-<!-- ── ÉCRAN PIN ── -->
-<div id="pin-screen">
-  <div class="pin-logo">&#127937;</div>
-  <div class="pin-title">Reservations</div>
-  <div class="pin-sub" id="pin-sub">Entrez votre code PIN</div>
-  <div class="pin-dots">
-    <div class="pin-dot" id="pd0"></div>
-    <div class="pin-dot" id="pd1"></div>
-    <div class="pin-dot" id="pd2"></div>
-    <div class="pin-dot" id="pd3"></div>
-  </div>
-  <div class="pin-pad">
-    <div class="pin-key" onclick="pinKey('1')">1</div>
-    <div class="pin-key" onclick="pinKey('2')">2</div>
-    <div class="pin-key" onclick="pinKey('3')">3</div>
-    <div class="pin-key" onclick="pinKey('4')">4</div>
-    <div class="pin-key" onclick="pinKey('5')">5</div>
-    <div class="pin-key" onclick="pinKey('6')">6</div>
-    <div class="pin-key" onclick="pinKey('7')">7</div>
-    <div class="pin-key" onclick="pinKey('8')">8</div>
-    <div class="pin-key" onclick="pinKey('9')">9</div>
-    <div class="pin-key pin-empty"></div>
-    <div class="pin-key" onclick="pinKey('0')">0</div>
-    <div class="pin-key pin-del" onclick="pinDel()">⌫</div>
-  </div>
-  <div class="pin-error-msg" id="pin-error">Code incorrect</div>
-  <div class="pin-change-wrap">
-    <button class="pin-link" id="pin-change-btn" style="display:none" onclick="pinStartChange()">Changer le PIN</button>
-  </div>
-</div>
 
 <header>
   <div class="logo">
@@ -294,7 +243,6 @@ var DEFAULT_VEHICULES=['Ford Blanc Prod / SAV / DA-204-XB','Truck Volkswagen noi
 // ── DONNÉES EN MÉMOIRE (synchronisées depuis Firebase) ───────────
 var _reservations = [];
 var _lists = { pilotes: DEFAULT_PILOTES.slice(), terrains: DEFAULT_TERRAINS.slice(), vehicules: DEFAULT_VEHICULES.slice() };
-var _pin = '1234'; // sera écrasé par Firebase au chargement
 
 // ── LECTURE / ÉCRITURE FIREBASE ──────────────────────────────────
 function loadRes(){ return _reservations; }
@@ -343,11 +291,6 @@ function initFirebase(){
       populateSelects();
       renderManage();
     });
-  });
-
-  // PIN partagé via Firebase
-  onValue(ref(db, 'config/pin'), function(snap){
-    _pin = snap.val() || '1234';
   });
 }
 
@@ -576,9 +519,6 @@ function updateHeaderDate(){
 }
 
 // ── EXPOSITION GLOBALE (nécessaire avec type="module") ───────────
-window.pinKey = pinKey;
-window.pinDel = pinDel;
-window.pinStartChange = pinStartChange;
 window.switchTab = switchTab;
 window.submitReservation = submitReservation;
 window.confirmForce = confirmForce;
@@ -596,106 +536,6 @@ initCal();
 initFirebase();
 document.getElementById('f-date-debut').value=today();
 document.getElementById('f-date-fin').value=today();
-
-// ── PIN LOGIC ────────────────────────────────────────────────────
-var PIN_DEFAULT = '1234';
-var pinBuffer = '';
-var pinMode = 'unlock'; // 'unlock' | 'set-new1' | 'set-new2'
-var pinTemp = '';
-
-function getPin(){ return _pin; }
-function savePin(p){
-  _pin = p;
-  set(ref(db, 'config/pin'), p).catch(function(e){ console.error('savePin', e); });
-}
-
-function pinKey(digit){
-  if(pinBuffer.length >= 4) return;
-  pinBuffer += digit;
-  updatePinDots();
-  if(pinBuffer.length === 4) setTimeout(pinCheck, 120);
-}
-
-function pinDel(){
-  pinBuffer = pinBuffer.slice(0, -1);
-  updatePinDots(false);
-}
-
-function updatePinDots(fill){
-  for(var i=0;i<4;i++){
-    var d = document.getElementById('pd'+i);
-    d.classList.toggle('filled', i < pinBuffer.length);
-    d.classList.remove('error');
-  }
-}
-
-function pinCheck(){
-  if(pinMode === 'unlock'){
-    if(pinBuffer === getPin()){
-      document.getElementById('pin-screen').classList.add('hidden');
-      document.getElementById('pin-change-btn').style.display = 'inline';
-    } else {
-      pinShakeError('Code incorrect');
-    }
-  } else if(pinMode === 'set-new1'){
-    pinTemp = pinBuffer;
-    pinBuffer = '';
-    updatePinDots();
-    document.getElementById('pin-sub').textContent = 'Confirmez le nouveau PIN';
-    pinMode = 'set-new2';
-  } else if(pinMode === 'set-new2'){
-    if(pinBuffer === pinTemp){
-      savePin(pinBuffer);
-      pinBuffer = '';
-      pinMode = 'unlock';
-      document.getElementById('pin-sub').textContent = 'Entrez votre code PIN';
-      updatePinDots();
-      document.getElementById('pin-screen').classList.add('hidden');
-      showToast('Nouveau PIN enregistre !');
-    } else {
-      pinShakeError('Les PIN ne correspondent pas');
-      pinMode = 'set-new1';
-      pinTemp = '';
-      document.getElementById('pin-sub').textContent = 'Choisissez un nouveau PIN';
-    }
-  }
-}
-
-function pinShakeError(msg){
-  for(var i=0;i<4;i++) document.getElementById('pd'+i).classList.add('error');
-  var err = document.getElementById('pin-error');
-  err.textContent = msg;
-  err.classList.add('show');
-  setTimeout(function(){
-    pinBuffer = '';
-    updatePinDots();
-    err.classList.remove('show');
-  }, 1200);
-}
-
-function pinStartChange(){
-  pinBuffer = '';
-  pinTemp = '';
-  pinMode = 'set-new1';
-  document.getElementById('pin-sub').textContent = 'Choisissez un nouveau PIN';
-  updatePinDots();
-  document.getElementById('pin-screen').classList.remove('hidden');
-}
-
-// Afficher le bouton "Changer PIN" dans onglet Gestion
-// (injecté dynamiquement dans renderManage)
-var _origRenderManage = renderManage;
-renderManage = function(){
-  _origRenderManage();
-  var manage = document.getElementById('view-manage');
-  if(!document.getElementById('pin-section')){
-    var sec = document.createElement('div');
-    sec.className = 'manage-section';
-    sec.id = 'pin-section';
-    sec.innerHTML = '<h3>Securite</h3><button class="btn btn-cancel" onclick="pinStartChange()" style="margin-top:4px">🔒 Changer le code PIN</button>';
-    manage.appendChild(sec);
-  }
-};
 </script>
 </body>
 </html>
