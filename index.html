@@ -359,13 +359,29 @@ function removeItem(key,index){
 // ─── CONFLICTS ───────────────────────────────────────────────
 function detectConflicts(newRes){
   var c={terrain:[],vehicule:[]};
+
   getResList().forEach(function(r){
-    if(r._fbKey===newRes._fbKey)return;
-    var overlap=newRes.dateDebut<=r.dateFin&&newRes.dateFin>=r.dateDebut;
-    if(!overlap)return;
-    if(r.terrain===newRes.terrain)c.terrain.push(r);
-    if(r.vehicule===newRes.vehicule)c.vehicule.push(r);
+    if(r._fbKey===newRes._fbKey) return;
+
+    var dateOverlap =
+      newRes.dateDebut <= r.dateFin &&
+      newRes.dateFin >= r.dateDebut;
+
+    if(!dateOverlap) return;
+
+    var timeOverlap =
+      newRes.heureDebut < r.heureFin &&
+      newRes.heureFin > r.heureDebut;
+
+    if(r.terrain === newRes.terrain){
+      c.terrain.push(r);
+    }
+
+    if(r.vehicule === newRes.vehicule && timeOverlap){
+      c.vehicule.push(r);
+    }
   });
+
   return c;
 }
 
@@ -390,7 +406,7 @@ function submitReservation(force){
     showAlert('alert-error','La date de fin est avant la date de debut.');return;
   }
 
-  var conflicts=detectConflicts({dateDebut:dateDebut,dateFin:dateFin,terrain:terrain,vehicule:vehicule,_fbKey:null});
+  var conflicts=detectConflicts({dateDebut:dateDebut,dateFin:dateFin,heureDebut:heureDebut,heureFin:heureFin,terrain:terrain,vehicule:vehicule,_fbKey:null});
 
   if(conflicts.vehicule.length>0){
     var names=conflicts.vehicule.map(function(r){return r.pilote+' ('+fmtDate(r.dateDebut)+')';}).join(', ');
