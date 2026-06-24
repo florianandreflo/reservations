@@ -575,6 +575,22 @@ function updateHeaderDate(){
   document.getElementById('headerDate').textContent=days[now.getDay()]+' '+now.getDate()+' '+months[now.getMonth()];
 }
 
+// ── EXPOSITION GLOBALE (nécessaire avec type="module") ───────────
+window.pinKey = pinKey;
+window.pinDel = pinDel;
+window.pinStartChange = pinStartChange;
+window.switchTab = switchTab;
+window.submitReservation = submitReservation;
+window.confirmForce = confirmForce;
+window.closeModal = closeModal;
+window.filterList = filterList;
+window.deleteRes = deleteRes;
+window.calPrev = calPrev;
+window.calNext = calNext;
+window.showCalDetail = showCalDetail;
+window.addItem = addItem;
+window.removeItem = removeItem;
+
 updateHeaderDate();
 initCal();
 initFirebase();
